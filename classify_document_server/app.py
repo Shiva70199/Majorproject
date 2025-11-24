@@ -5,10 +5,25 @@ Deploy to Railway, Render, Fly.io, or any Python hosting service.
 Uses HuggingFace Donut-base model to classify academic documents.
 """
 
+import os
+import sys
+
+# Create Flask app first (before any heavy imports)
 from flask import Flask, request, jsonify
+app = Flask(__name__)
+
+# Add a minimal health endpoint immediately (before CORS and other imports)
+@app.route('/health', methods=['GET'])
+def health_check_minimal():
+    """Minimal health check - works even if other imports fail"""
+    return jsonify({
+        "status": "ok",
+        "message": "Server is running"
+    }), 200
+
+# Now import other dependencies
 from flask_cors import CORS
 import base64
-import os
 from io import BytesIO
 from typing import Dict, Any, Optional
 import gc
@@ -18,9 +33,9 @@ try:
     from PIL import Image
     import torch
     DEPENDENCIES_AVAILABLE = True
-except ImportError:
+except ImportError as e:
     DEPENDENCIES_AVAILABLE = False
-    print("Warning: transformers, PIL, or torch not available")
+    print(f"Warning: transformers, PIL, or torch not available: {e}")
 
 app = Flask(__name__)
 # Enable CORS for all routes with explicit configuration for Flutter Web
@@ -217,8 +232,8 @@ def classify_document(image_bytes: bytes) -> Dict[str, Any]:
 
 
 @app.route('/health', methods=['GET'])
-def health_check():
-    """Health check endpoint - must always return 200 for Railway health checks"""
+def health_check_detailed():
+    """Detailed health check endpoint - returns model status"""
     try:
         model_loaded = _model is not None and _processor is not None
         return jsonify({
