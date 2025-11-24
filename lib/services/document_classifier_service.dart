@@ -32,17 +32,25 @@ class DocumentClassifierService {
   // Configurable classification server URL
   // Set this to your deployed server URL (Railway, Render, etc.)
   // Leave null to use Supabase Edge Function
-  static String? customClassificationUrl;
+  static const String? customClassificationUrl = 'https://majorproject-production-a70b.up.railway.app';
   
   /// Get the classification endpoint URL
   String get _classificationUrl {
+    // FORCE use Railway server (override any Supabase fallback)
+    const railwayUrl = 'https://majorproject-production-a70b.up.railway.app';
+    if (railwayUrl.isNotEmpty) {
+      // Use Railway server
+      return railwayUrl.endsWith('/classify') 
+          ? railwayUrl 
+          : '${railwayUrl.replaceAll(RegExp(r'/$'), '')}/classify';
+    }
+    // Fallback (should not reach here)
     if (customClassificationUrl != null && customClassificationUrl!.isNotEmpty) {
-      // Use custom standalone server (Railway, Render, etc.)
       return customClassificationUrl!.endsWith('/classify') 
           ? customClassificationUrl! 
           : '${customClassificationUrl!.replaceAll(RegExp(r'/$'), '')}/classify';
     }
-    // Default: Use Supabase Edge Function
+    // Default: Use Supabase Edge Function (should not be used)
     return '$supabaseUrl/functions/v1/classifyDocument';
   }
   
@@ -67,6 +75,16 @@ class DocumentClassifierService {
   }) async {
     try {
       final functionUrl = _classificationUrl;
+      
+      // Debug: Print the URL being used
+      print('🔍 Classification URL: $functionUrl');
+      print('🔍 Railway URL: https://majorproject-production-a70b.up.railway.app');
+      print('🔍 Using custom server: $_usesCustomServer');
+      
+      // Verify we're using Railway, not Supabase
+      if (functionUrl.contains('supabase.co')) {
+        throw Exception('ERROR: Still using Supabase URL! Expected Railway URL. Please restart the app completely.');
+      }
       
       // Create multipart request
       final request = http.MultipartRequest('POST', Uri.parse(functionUrl));
