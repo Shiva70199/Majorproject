@@ -1,0 +1,17 @@
+# Supabase Edge Function: Document Classification
+# Requirements for Donut-base model classification
+
+# Core dependencies
+supabase>=2.0.0
+transformers>=4.30.0
+torch>=2.0.0
+Pillow>=10.0.0
+numpy>=1.24.0
+
+# HuggingFace model dependencies
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+
+# Image processing
+opencv-python-headless>=4.8.0
+
