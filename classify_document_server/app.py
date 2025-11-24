@@ -173,7 +173,12 @@ def classify():
     """Main classification endpoint"""
     # Handle CORS preflight
     if request.method == 'OPTIONS':
-        return jsonify({"message": "OK"}), 200
+        response = jsonify({"message": "OK"})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Max-Age', '3600')
+        return response, 200
     
     try:
         # Get image from request
@@ -224,7 +229,12 @@ def classify():
         # Classify document
         result = classify_document(image_bytes)
         
-        return jsonify(result), 200
+        # Create response with explicit CORS headers for Flutter Web
+        response = jsonify(result)
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS, GET')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        return response, 200
         
     except Exception as e:
         print(f"Handler error: {str(e)}")
