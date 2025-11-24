@@ -11,6 +11,8 @@ import base64
 import os
 from io import BytesIO
 from typing import Dict, Any, Optional
+import threading
+import time
 
 try:
     from transformers import DonutProcessor, VisionEncoderDecoderModel
@@ -40,39 +42,83 @@ ACADEMIC_KEYWORDS = [
 # Global model and processor (loaded once, reused across requests)
 _model = None
 _processor = None
+_model_loading = False
+_model_load_error = None
 
 
 def load_model():
     """Load Donut model and processor (lazy loading, cached globally)"""
-    global _model, _processor
+    global _model, _processor, _model_loading, _model_load_error
     
     if not DEPENDENCIES_AVAILABLE:
         raise ImportError("Required dependencies (transformers, PIL, torch) are not installed")
     
-    if _model is None or _processor is None:
+    # If model is already loaded, return it
+    if _model is not None and _processor is not None:
+        return _model, _processor
+    
+    # If model is currently loading, wait for it
+    if _model_loading:
+        print("⏳ Model is currently loading, waiting...")
+        max_wait = 120  # Wait up to 2 minutes
+        waited = 0
+        while _model_loading and waited < max_wait:
+            time.sleep(2)
+            waited += 2
+            if _model is not None and _processor is not None:
+                return _model, _processor
+        
+        if _model_load_error:
+            raise Exception(f"Model loading failed: {_model_load_error}")
+        if _model is None or _processor is None:
+            raise Exception("Model loading timeout")
+    
+    # Start loading the model
+    _model_loading = True
+    _model_load_error = None
+    
+    print("=" * 50)
+    print("Loading Donut-base model from HuggingFace...")
+    print("This may take 30-60 seconds...")
+    print("=" * 50)
+    try:
+        # Load processor and model from HuggingFace
+        _processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
+        _model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base")
+        
+        # Set model to evaluation mode
+        _model.eval()
+        
+        # Use CPU for inference
+        _model.to("cpu")
+        
         print("=" * 50)
-        print("Loading Donut-base model from HuggingFace...")
-        print("This may take 30-60 seconds on first request...")
+        print("✅ Donut-base model loaded successfully!")
         print("=" * 50)
-        try:
-            # Load processor and model from HuggingFace
-            _processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
-            _model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base")
-            
-            # Set model to evaluation mode
-            _model.eval()
-            
-            # Use CPU for inference
-            _model.to("cpu")
-            
-            print("=" * 50)
-            print("✅ Donut-base model loaded successfully!")
-            print("=" * 50)
-        except Exception as e:
-            print(f"❌ Error loading model: {str(e)}")
-            raise
+        _model_loading = False
+    except Exception as e:
+        _model_loading = False
+        _model_load_error = str(e)
+        print(f"❌ Error loading model: {str(e)}")
+        raise
     
     return _model, _processor
+
+
+def preload_model_background():
+    """Pre-load model in background thread during startup"""
+    def load():
+        try:
+            print("🚀 Starting background model pre-loading...")
+            load_model()
+            print("✅ Background model pre-loading completed!")
+        except Exception as e:
+            print(f"⚠️  Background model pre-loading failed: {str(e)}")
+            print("Model will be loaded on first request instead.")
+    
+    thread = threading.Thread(target=load, daemon=True)
+    thread.start()
+    return thread
 
 
 def classify_document(image_bytes: bytes) -> Dict[str, Any]:
@@ -166,9 +212,12 @@ def classify_document(image_bytes: bytes) -> Dict[str, Any]:
 @app.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""
+    model_loaded = _model is not None and _processor is not None
     return jsonify({
-        "status": "healthy",
-        "model_loaded": _model is not None,
+        "status": "healthy" if DEPENDENCIES_AVAILABLE else "unhealthy",
+        "model_loaded": model_loaded,
+        "model_loading": _model_loading,
+        "model_load_error": _model_load_error,
         "dependencies_available": DEPENDENCIES_AVAILABLE
     })
 
@@ -232,9 +281,11 @@ def classify():
             }), 400
         
         # Check if model needs to be loaded (first request)
-        model_needs_loading = _model is None
+        model_needs_loading = _model is None and not _model_loading
         if model_needs_loading:
-            print("⚠️  Model not loaded yet. This first request will take longer (30-60s)...")
+            print("⚠️  Model not loaded yet. Loading now (this may take 30-60s)...")
+        elif _model_loading:
+            print("⏳ Model is currently loading in background, waiting...")
         
         # Classify document
         result = classify_document(image_bytes)
@@ -277,7 +328,18 @@ def index():
     })
 
 
+# Pre-load model in background when app starts (for Railway/deployment)
+# This prevents the first request from timing out
+print("=" * 50)
+print("🚀 Starting Document Classification Server...")
+print("=" * 50)
+
+# Start background model loading
+preload_thread = preload_model_background()
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    print(f"📡 Server starting on port {port}...")
+    print("⏳ Model is loading in background. First request may still take time if model isn't ready.")
     app.run(host='0.0.0.0', port=port, debug=False)
 
