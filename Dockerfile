@@ -29,5 +29,6 @@ COPY app.py .
 # Expose port (Railway sets PORT env var)
 EXPOSE $PORT
 
-# Run with gunicorn
-CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+# Run with gunicorn - use explicit port binding with fallback
+# Railway sets PORT env var, but we need to ensure it's used correctly
+CMD sh -c "gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --access-logfile - --error-logfile -"
