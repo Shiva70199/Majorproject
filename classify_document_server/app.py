@@ -11,8 +11,7 @@ import base64
 import os
 from io import BytesIO
 from typing import Dict, Any, Optional
-import threading
-import time
+import gc
 
 try:
     from transformers import DonutProcessor, VisionEncoderDecoderModel
@@ -79,11 +78,21 @@ def load_model():
     
     print("=" * 50)
     print("Loading Donut-base model from HuggingFace...")
+    print("⚠️  WARNING: This requires ~2-3GB RAM. Railway free tier may not have enough.")
     print("This may take 30-60 seconds...")
     print("=" * 50)
+    
+    # Force garbage collection before loading to free up memory
+    gc.collect()
+    
     try:
-        # Load processor and model from HuggingFace
+        # Load processor first (smaller, less memory)
+        print("📦 Loading processor...")
         _processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
+        gc.collect()  # Free memory after processor load
+        
+        # Load model (this is the memory-intensive part)
+        print("📦 Loading model (this may cause OOM on Railway free tier)...")
         _model = VisionEncoderDecoderModel.from_pretrained("naver-clova-ix/donut-base")
         
         # Set model to evaluation mode
@@ -91,6 +100,9 @@ def load_model():
         
         # Use CPU for inference
         _model.to("cpu")
+        
+        # Force garbage collection after loading
+        gc.collect()
         
         print("=" * 50)
         print("✅ Donut-base model loaded successfully!")
@@ -100,25 +112,20 @@ def load_model():
         _model_loading = False
         _model_load_error = str(e)
         print(f"❌ Error loading model: {str(e)}")
+        if "out of memory" in str(e).lower() or "oom" in str(e).lower():
+            print("💡 SOLUTION: Railway free tier doesn't have enough RAM (needs ~2-3GB).")
+            print("   Options:")
+            print("   1. Upgrade Railway plan (not free)")
+            print("   2. Use HuggingFace Inference API (free tier available)")
+            print("   3. Deploy to Render/Fly.io with more RAM")
+        gc.collect()  # Clean up on error
         raise
     
     return _model, _processor
 
 
-def preload_model_background():
-    """Pre-load model in background thread during startup"""
-    def load():
-        try:
-            print("🚀 Starting background model pre-loading...")
-            load_model()
-            print("✅ Background model pre-loading completed!")
-        except Exception as e:
-            print(f"⚠️  Background model pre-loading failed: {str(e)}")
-            print("Model will be loaded on first request instead.")
-    
-    thread = threading.Thread(target=load, daemon=True)
-    thread.start()
-    return thread
+# Background pre-loading disabled to prevent OOM on Railway free tier
+# Model will be loaded lazily on first request instead
 
 
 def classify_document(image_bytes: bytes) -> Dict[str, Any]:
@@ -328,18 +335,16 @@ def index():
     })
 
 
-# Pre-load model in background when app starts (for Railway/deployment)
-# This prevents the first request from timing out
+# Background pre-loading disabled to prevent OOM on Railway free tier
+# Model will be loaded lazily on first request
 print("=" * 50)
 print("🚀 Starting Document Classification Server...")
+print("⚠️  Model will load on first request (may take 30-60s)")
+print("⚠️  Railway free tier may not have enough RAM (needs ~2-3GB)")
 print("=" * 50)
-
-# Start background model loading
-preload_thread = preload_model_background()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     print(f"📡 Server starting on port {port}...")
-    print("⏳ Model is loading in background. First request may still take time if model isn't ready.")
     app.run(host='0.0.0.0', port=port, debug=False)
 

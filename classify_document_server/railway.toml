@@ -1,0 +1,15 @@
+# Railway configuration
+# Note: Railway free tier has limited RAM (~512MB-1GB)
+# Donut model needs ~2-3GB RAM, so free tier may not work
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180"
+healthcheckPath = "/health"
+healthcheckTimeout = 100
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
+
