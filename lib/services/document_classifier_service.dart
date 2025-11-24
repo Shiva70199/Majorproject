@@ -169,11 +169,12 @@ class DocumentClassifierService {
         debugPrint('📤 Sending request to: $functionUrl');
       }
       
-      // Send request with timeout
+      // Send request with extended timeout (first request loads model, takes 30-60s)
+      // Total timeout: 120 seconds for request + 60 seconds for response = 180s max
       final streamedResponse = await request.send().timeout(
-        const Duration(seconds: 60),
+        const Duration(seconds: 120),
         onTimeout: () {
-          throw Exception('Request timeout: Server did not respond within 60 seconds');
+          throw Exception('Request timeout: Server did not respond within 120 seconds. This may happen on the first request while the model is loading. Please try again.');
         },
       );
       
@@ -182,9 +183,9 @@ class DocumentClassifierService {
       }
       
       final response = await http.Response.fromStream(streamedResponse).timeout(
-        const Duration(seconds: 30),
+        const Duration(seconds: 60),
         onTimeout: () {
-          throw Exception('Response timeout: Could not read response body');
+          throw Exception('Response timeout: Could not read response body within 60 seconds. The model may still be loading. Please try again.');
         },
       );
       
@@ -321,15 +322,15 @@ class DocumentClassifierService {
         debugPrint('📤 Sending base64 request to: $functionUrl');
       }
       
-      // Send POST request with timeout
+      // Send POST request with extended timeout (first request loads model, takes 30-60s)
       final response = await http.post(
         Uri.parse(functionUrl),
         headers: headers,
         body: requestBody,
       ).timeout(
-        const Duration(seconds: 60),
+        const Duration(seconds: 120),
         onTimeout: () {
-          throw Exception('Request timeout: Server did not respond within 60 seconds');
+          throw Exception('Request timeout: Server did not respond within 120 seconds. This may happen on the first request while the model is loading. Please try again.');
         },
       );
       

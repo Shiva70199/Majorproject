@@ -50,7 +50,10 @@ def load_model():
         raise ImportError("Required dependencies (transformers, PIL, torch) are not installed")
     
     if _model is None or _processor is None:
-        print("Loading Donut-base model...")
+        print("=" * 50)
+        print("Loading Donut-base model from HuggingFace...")
+        print("This may take 30-60 seconds on first request...")
+        print("=" * 50)
         try:
             # Load processor and model from HuggingFace
             _processor = DonutProcessor.from_pretrained("naver-clova-ix/donut-base")
@@ -62,9 +65,11 @@ def load_model():
             # Use CPU for inference
             _model.to("cpu")
             
-            print("Donut-base model loaded successfully")
+            print("=" * 50)
+            print("✅ Donut-base model loaded successfully!")
+            print("=" * 50)
         except Exception as e:
-            print(f"Error loading model: {str(e)}")
+            print(f"❌ Error loading model: {str(e)}")
             raise
     
     return _model, _processor
@@ -225,6 +230,11 @@ def classify():
                 "text": "",
                 "reason": "Image too large"
             }), 400
+        
+        # Check if model needs to be loaded (first request)
+        model_needs_loading = _model is None
+        if model_needs_loading:
+            print("⚠️  Model not loaded yet. This first request will take longer (30-60s)...")
         
         # Classify document
         result = classify_document(image_bytes)
