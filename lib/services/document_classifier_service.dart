@@ -1,5 +1,5 @@
-import 'dart:typed_data';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show supabaseUrl, supabaseAnonKey;
@@ -76,10 +76,12 @@ class DocumentClassifierService {
     try {
       final functionUrl = _classificationUrl;
       
-      // Debug: Print the URL being used
-      print('🔍 Classification URL: $functionUrl');
-      print('🔍 Railway URL: https://majorproject-production-a70b.up.railway.app');
-      print('🔍 Using custom server: $_usesCustomServer');
+      // Debug: Log the URL being used (using debugPrint for Flutter best practices)
+      if (kDebugMode) {
+        debugPrint('🔍 Classification URL: $functionUrl');
+        debugPrint('🔍 Railway URL: https://majorproject-production-a70b.up.railway.app');
+        debugPrint('🔍 Using custom server: $_usesCustomServer');
+      }
       
       // Verify we're using Railway, not Supabase
       if (functionUrl.contains('supabase.co')) {
