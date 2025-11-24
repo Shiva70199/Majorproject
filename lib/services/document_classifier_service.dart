@@ -58,6 +58,43 @@ class DocumentClassifierService {
   /// Check if using custom server (doesn't need auth token)
   bool get _usesCustomServer => customClassificationUrl.isNotEmpty;
 
+  /// Test connection to classification server
+  /// Returns true if server is reachable, false otherwise
+  Future<bool> testConnection() async {
+    try {
+      final healthUrl = _classificationUrl.replaceAll('/classify', '/health');
+      if (kDebugMode) {
+        debugPrint('🔍 Testing connection to: $healthUrl');
+      }
+      
+      final response = await http.get(
+        Uri.parse(healthUrl),
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout');
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        if (kDebugMode) {
+          debugPrint('✅ Server connection successful');
+        }
+        return true;
+      } else {
+        if (kDebugMode) {
+          debugPrint('❌ Server returned status: ${response.statusCode}');
+        }
+        return false;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('❌ Connection test failed: $e');
+      }
+      return false;
+    }
+  }
+
   /// Classify a document image using Donut-base model
   /// 
   /// Sends the image to the classification server (Supabase Edge Function or standalone)
@@ -82,6 +119,8 @@ class DocumentClassifierService {
         debugPrint('🔍 Classification URL: $functionUrl');
         debugPrint('🔍 Railway URL: https://majorproject-production-a70b.up.railway.app');
         debugPrint('🔍 Using custom server: $_usesCustomServer');
+        debugPrint('🔍 File size: ${fileBytes.length} bytes');
+        debugPrint('🔍 File name: ${fileName ?? "unknown"}');
       }
       
       // Verify we're using Railway, not Supabase
@@ -91,6 +130,9 @@ class DocumentClassifierService {
       
       // For web, use base64 encoding (more reliable than multipart on web)
       if (kIsWeb) {
+        if (kDebugMode) {
+          debugPrint('🌐 Using base64 encoding for web platform');
+        }
         return await classifyDocumentBase64(
           fileBytes: fileBytes,
           fileName: fileName,
@@ -98,6 +140,10 @@ class DocumentClassifierService {
       }
       
       // For mobile/desktop, use multipart
+      if (kDebugMode) {
+        debugPrint('📱 Using multipart encoding for mobile/desktop platform');
+      }
+      
       // Create multipart request
       final request = http.MultipartRequest('POST', Uri.parse(functionUrl));
       
@@ -119,25 +165,72 @@ class DocumentClassifierService {
         ),
       );
       
-      // Send request
-      final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      if (kDebugMode) {
+        debugPrint('📤 Sending request to: $functionUrl');
+      }
+      
+      // Send request with timeout
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw Exception('Request timeout: Server did not respond within 60 seconds');
+        },
+      );
+      
+      if (kDebugMode) {
+        debugPrint('📥 Received response: ${streamedResponse.statusCode}');
+      }
+      
+      final response = await http.Response.fromStream(streamedResponse).timeout(
+        const Duration(seconds: 30),
+        onTimeout: () {
+          throw Exception('Response timeout: Could not read response body');
+        },
+      );
+      
+      if (kDebugMode) {
+        debugPrint('📄 Response body length: ${response.body.length}');
+        debugPrint('📄 Response status: ${response.statusCode}');
+      }
       
       // Parse response
       if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body) as Map<String, dynamic>;
-        
-        return DocumentClassificationResult(
-          isAcademic: jsonResponse['is_academic'] as bool? ?? false,
-          score: jsonResponse['score'] as int? ?? 0,
-          text: jsonResponse['text'] as String? ?? '',
-          reason: jsonResponse['reason'] as String? ?? 'No reason provided',
-          matchedKeywords: jsonResponse['matched_keywords'] != null
-              ? List<String>.from(jsonResponse['matched_keywords'] as List)
-              : null,
-        );
+        try {
+          final jsonResponse = json.decode(response.body) as Map<String, dynamic>;
+          
+          if (kDebugMode) {
+            debugPrint('✅ Classification successful: ${jsonResponse['is_academic']}');
+            debugPrint('📊 Score: ${jsonResponse['score']}');
+          }
+          
+          return DocumentClassificationResult(
+            isAcademic: jsonResponse['is_academic'] as bool? ?? false,
+            score: jsonResponse['score'] as int? ?? 0,
+            text: jsonResponse['text'] as String? ?? '',
+            reason: jsonResponse['reason'] as String? ?? 'No reason provided',
+            matchedKeywords: jsonResponse['matched_keywords'] != null
+                ? List<String>.from(jsonResponse['matched_keywords'] as List)
+                : null,
+          );
+        } catch (parseError) {
+          if (kDebugMode) {
+            debugPrint('❌ JSON parse error: $parseError');
+            debugPrint('❌ Response body: ${response.body.substring(0, response.body.length > 500 ? 500 : response.body.length)}');
+          }
+          return DocumentClassificationResult(
+            isAcademic: false,
+            score: 0,
+            text: '',
+            reason: 'Invalid response from server. Please check server logs.',
+          );
+        }
       } else {
         // Handle error response
+        if (kDebugMode) {
+          debugPrint('❌ Error response: ${response.statusCode}');
+          debugPrint('❌ Response body: ${response.body}');
+        }
+        
         try {
           final errorJson = json.decode(response.body) as Map<String, dynamic>;
           final errorMessage = errorJson['error'] as String? ?? 
@@ -148,24 +241,40 @@ class DocumentClassifierService {
             isAcademic: false,
             score: 0,
             text: '',
-            reason: 'Classification failed: $errorMessage',
+            reason: 'Classification failed: $errorMessage (HTTP ${response.statusCode})',
           );
         } catch (_) {
           return DocumentClassificationResult(
             isAcademic: false,
             score: 0,
             text: '',
-            reason: 'Classification failed: HTTP ${response.statusCode} - ${response.body}',
+            reason: 'Classification failed: HTTP ${response.statusCode} - ${response.body.length > 200 ? response.body.substring(0, 200) + "..." : response.body}',
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
       // Handle network or other errors
+      if (kDebugMode) {
+        debugPrint('❌ Classification exception: $e');
+        debugPrint('❌ Stack trace: $stackTrace');
+      }
+      
+      String errorMessage = e.toString();
+      
+      // Provide more helpful error messages
+      if (errorMessage.contains('Failed host lookup') || errorMessage.contains('SocketException')) {
+        errorMessage = 'Cannot connect to classification server. Please check your internet connection and ensure the server is running.';
+      } else if (errorMessage.contains('timeout')) {
+        errorMessage = 'Request timed out. The server may be overloaded. Please try again.';
+      } else if (errorMessage.contains('CORS')) {
+        errorMessage = 'CORS error. Please check server CORS configuration.';
+      }
+      
       return DocumentClassificationResult(
         isAcademic: false,
         score: 0,
         text: '',
-        reason: 'Classification error: ${e.toString()}',
+        reason: 'Classification error: $errorMessage',
       );
     }
   }
@@ -178,6 +287,11 @@ class DocumentClassifierService {
   }) async {
     try {
       final functionUrl = _classificationUrl;
+      
+      if (kDebugMode) {
+        debugPrint('🌐 Base64 classification - URL: $functionUrl');
+        debugPrint('🌐 File size: ${fileBytes.length} bytes');
+      }
       
       // Prepare headers
       final headers = <String, String>{
@@ -194,32 +308,71 @@ class DocumentClassifierService {
       // Encode image to base64
       final base64Image = base64Encode(fileBytes);
       
+      if (kDebugMode) {
+        debugPrint('🌐 Base64 encoded size: ${base64Image.length} characters');
+      }
+      
       // Create JSON request body
       final requestBody = json.encode({
         'image': base64Image,
       });
       
-      // Send POST request
+      if (kDebugMode) {
+        debugPrint('📤 Sending base64 request to: $functionUrl');
+      }
+      
+      // Send POST request with timeout
       final response = await http.post(
         Uri.parse(functionUrl),
         headers: headers,
         body: requestBody,
+      ).timeout(
+        const Duration(seconds: 60),
+        onTimeout: () {
+          throw Exception('Request timeout: Server did not respond within 60 seconds');
+        },
       );
+      
+      if (kDebugMode) {
+        debugPrint('📥 Base64 response: ${response.statusCode}');
+        debugPrint('📄 Response body length: ${response.body.length}');
+      }
       
       // Parse response
       if (response.statusCode == 200) {
-        final jsonResponse = json.decode(response.body) as Map<String, dynamic>;
-        
-        return DocumentClassificationResult(
-          isAcademic: jsonResponse['is_academic'] as bool? ?? false,
-          score: jsonResponse['score'] as int? ?? 0,
-          text: jsonResponse['text'] as String? ?? '',
-          reason: jsonResponse['reason'] as String? ?? 'No reason provided',
-          matchedKeywords: jsonResponse['matched_keywords'] != null
-              ? List<String>.from(jsonResponse['matched_keywords'] as List)
-              : null,
-        );
+        try {
+          final jsonResponse = json.decode(response.body) as Map<String, dynamic>;
+          
+          if (kDebugMode) {
+            debugPrint('✅ Base64 classification successful: ${jsonResponse['is_academic']}');
+          }
+          
+          return DocumentClassificationResult(
+            isAcademic: jsonResponse['is_academic'] as bool? ?? false,
+            score: jsonResponse['score'] as int? ?? 0,
+            text: jsonResponse['text'] as String? ?? '',
+            reason: jsonResponse['reason'] as String? ?? 'No reason provided',
+            matchedKeywords: jsonResponse['matched_keywords'] != null
+                ? List<String>.from(jsonResponse['matched_keywords'] as List)
+                : null,
+          );
+        } catch (parseError) {
+          if (kDebugMode) {
+            debugPrint('❌ Base64 JSON parse error: $parseError');
+          }
+          return DocumentClassificationResult(
+            isAcademic: false,
+            score: 0,
+            text: '',
+            reason: 'Invalid response from server. Please check server logs.',
+          );
+        }
       } else {
+        if (kDebugMode) {
+          debugPrint('❌ Base64 error response: ${response.statusCode}');
+          debugPrint('❌ Response body: ${response.body}');
+        }
+        
         try {
           final errorJson = json.decode(response.body) as Map<String, dynamic>;
           final errorMessage = errorJson['error'] as String? ?? 
@@ -230,7 +383,7 @@ class DocumentClassifierService {
             isAcademic: false,
             score: 0,
             text: '',
-            reason: 'Classification failed: $errorMessage',
+            reason: 'Classification failed: $errorMessage (HTTP ${response.statusCode})',
           );
         } catch (_) {
           return DocumentClassificationResult(
@@ -241,12 +394,28 @@ class DocumentClassifierService {
           );
         }
       }
-    } catch (e) {
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('❌ Base64 classification exception: $e');
+        debugPrint('❌ Stack trace: $stackTrace');
+      }
+      
+      String errorMessage = e.toString();
+      
+      // Provide more helpful error messages
+      if (errorMessage.contains('Failed host lookup') || errorMessage.contains('SocketException')) {
+        errorMessage = 'Cannot connect to classification server. Please check your internet connection and ensure the server is running.';
+      } else if (errorMessage.contains('timeout')) {
+        errorMessage = 'Request timed out. The server may be overloaded. Please try again.';
+      } else if (errorMessage.contains('CORS')) {
+        errorMessage = 'CORS error. Please check server CORS configuration.';
+      }
+      
       return DocumentClassificationResult(
         isAcademic: false,
         score: 0,
         text: '',
-        reason: 'Classification error: ${e.toString()}',
+        reason: 'Classification error: $errorMessage',
       );
     }
   }
