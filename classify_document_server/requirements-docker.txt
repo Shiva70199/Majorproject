@@ -1,12 +1,9 @@
-# Python Server for Document Classification
-# Deploy to Railway, Render, Fly.io, or any Python hosting service
-
+# Optimized requirements for Docker (torch installed separately)
 # Web framework
 Flask>=3.0.0
 flask-cors>=4.0.0
 
-# ML dependencies
-# Note: torch is installed separately in Dockerfile (CPU-only, smaller)
+# ML dependencies (torch installed in Dockerfile as CPU-only)
 transformers>=4.30.0
 Pillow>=10.0.0
 numpy>=1.24.0
@@ -15,7 +12,7 @@ numpy>=1.24.0
 sentencepiece>=0.1.99
 protobuf>=3.20.0
 
-# Image processing
+# Image processing (headless version, smaller)
 opencv-python-headless>=4.8.0
 
 # Server
