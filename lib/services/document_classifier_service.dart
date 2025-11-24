@@ -1,5 +1,6 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode, kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show supabaseUrl, supabaseAnonKey;
