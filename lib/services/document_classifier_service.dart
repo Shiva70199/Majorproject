@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../main.dart' show supabaseUrl, supabaseAnonKey;
@@ -88,6 +88,15 @@ class DocumentClassifierService {
         throw Exception('ERROR: Still using Supabase URL! Expected Railway URL. Please restart the app completely.');
       }
       
+      // For web, use base64 encoding (more reliable than multipart on web)
+      if (kIsWeb) {
+        return await classifyDocumentBase64(
+          fileBytes: fileBytes,
+          fileName: fileName,
+        );
+      }
+      
+      // For mobile/desktop, use multipart
       // Create multipart request
       final request = http.MultipartRequest('POST', Uri.parse(functionUrl));
       

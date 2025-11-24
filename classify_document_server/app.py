@@ -22,7 +22,10 @@ except ImportError:
     print("Warning: transformers, PIL, or torch not available")
 
 app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes
+# Enable CORS for all routes with explicit configuration for Flutter Web
+CORS(app, 
+     resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}},
+     supports_credentials=False)
 
 # Academic keywords for classification
 ACADEMIC_KEYWORDS = [
