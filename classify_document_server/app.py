@@ -291,8 +291,9 @@ def classify():
         model_needs_loading = _model is None and not _model_loading
         if model_needs_loading:
             print("⚠️  Model not loaded yet. Loading now (this may take 30-60s)...")
+            print("⚠️  WARNING: This requires ~2-3GB RAM. Railway free tier may fail with OOM.")
         elif _model_loading:
-            print("⏳ Model is currently loading in background, waiting...")
+            print("⏳ Model is currently loading, waiting...")
         
         # Classify document
         result = classify_document(image_bytes)
