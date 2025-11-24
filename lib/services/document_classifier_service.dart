@@ -32,11 +32,11 @@ class DocumentClassifierService {
   // Configurable classification server URL
   // Set this to your deployed server URL (Railway, Render, etc.)
   // Leave null to use Supabase Edge Function
-  static const String? customClassificationUrl = 'https://majorproject-production-a70b.up.railway.app';
+  static const String customClassificationUrl = 'https://majorproject-production-a70b.up.railway.app';
   
   /// Get the classification endpoint URL
   String get _classificationUrl {
-    // FORCE use Railway server (override any Supabase fallback)
+    // Use Railway server (hardcoded for reliability)
     const railwayUrl = 'https://majorproject-production-a70b.up.railway.app';
     if (railwayUrl.isNotEmpty) {
       // Use Railway server
@@ -44,18 +44,18 @@ class DocumentClassifierService {
           ? railwayUrl 
           : '${railwayUrl.replaceAll(RegExp(r'/$'), '')}/classify';
     }
-    // Fallback (should not reach here)
-    if (customClassificationUrl != null && customClassificationUrl!.isNotEmpty) {
-      return customClassificationUrl!.endsWith('/classify') 
-          ? customClassificationUrl! 
-          : '${customClassificationUrl!.replaceAll(RegExp(r'/$'), '')}/classify';
+    // Fallback to customClassificationUrl if railwayUrl is empty (should not happen)
+    if (customClassificationUrl.isNotEmpty) {
+      return customClassificationUrl.endsWith('/classify') 
+          ? customClassificationUrl 
+          : '${customClassificationUrl.replaceAll(RegExp(r'/$'), '')}/classify';
     }
     // Default: Use Supabase Edge Function (should not be used)
     return '$supabaseUrl/functions/v1/classifyDocument';
   }
   
   /// Check if using custom server (doesn't need auth token)
-  bool get _usesCustomServer => customClassificationUrl != null && customClassificationUrl!.isNotEmpty;
+  bool get _usesCustomServer => customClassificationUrl.isNotEmpty;
 
   /// Classify a document image using Donut-base model
   /// 
