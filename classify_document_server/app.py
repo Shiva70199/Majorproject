@@ -218,15 +218,23 @@ def classify_document(image_bytes: bytes) -> Dict[str, Any]:
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    model_loaded = _model is not None and _processor is not None
-    return jsonify({
-        "status": "healthy" if DEPENDENCIES_AVAILABLE else "unhealthy",
-        "model_loaded": model_loaded,
-        "model_loading": _model_loading,
-        "model_load_error": _model_load_error,
-        "dependencies_available": DEPENDENCIES_AVAILABLE
-    })
+    """Health check endpoint - must always return 200 for Railway health checks"""
+    try:
+        model_loaded = _model is not None and _processor is not None
+        return jsonify({
+            "status": "healthy" if DEPENDENCIES_AVAILABLE else "unhealthy",
+            "model_loaded": model_loaded,
+            "model_loading": _model_loading,
+            "model_load_error": _model_load_error,
+            "dependencies_available": DEPENDENCIES_AVAILABLE
+        }), 200
+    except Exception as e:
+        # Always return 200 even on error, so Railway doesn't kill the container
+        return jsonify({
+            "status": "error",
+            "error": str(e),
+            "dependencies_available": DEPENDENCIES_AVAILABLE if 'DEPENDENCIES_AVAILABLE' in globals() else False
+        }), 200
 
 
 @app.route('/classify', methods=['POST', 'OPTIONS'])
@@ -338,8 +346,9 @@ def index():
 
 # Background pre-loading disabled to prevent OOM on Railway free tier
 # Model will be loaded lazily on first request
+# Note: When using gunicorn, this code runs when the module is imported
 print("=" * 50)
-print("🚀 Starting Document Classification Server...")
+print("🚀 Document Classification Server module loaded")
 print("⚠️  Model will load on first request (may take 30-60s)")
 print("⚠️  Railway free tier may not have enough RAM (needs ~2-3GB)")
 print("=" * 50)
