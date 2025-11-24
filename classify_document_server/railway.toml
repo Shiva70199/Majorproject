@@ -5,6 +5,7 @@
 [build]
 builder = "DOCKERFILE"
 dockerfilePath = "Dockerfile"
+rootDirectory = "classify_document_server"
 
 [deploy]
 startCommand = "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180"

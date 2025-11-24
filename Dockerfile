@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Copy requirements first (for better caching)
-COPY classify_document_server/requirements-docker.txt requirements.txt
+COPY requirements-docker.txt requirements.txt
 
 # Install Python dependencies with optimizations
 # Use CPU-only PyTorch (much smaller than GPU version, ~500MB vs ~2GB)
@@ -24,11 +24,10 @@ RUN pip install --no-cache-dir --upgrade pip && \
     find /usr/local/lib/python3.11 -type d -name __pycache__ -exec rm -r {} + 2>/dev/null || true
 
 # Copy application code
-COPY classify_document_server/app.py .
+COPY app.py .
 
 # Expose port (Railway sets PORT env var)
 EXPOSE $PORT
 
 # Run with gunicorn
-CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 180
-
+CMD gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
