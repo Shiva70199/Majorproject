@@ -19,8 +19,12 @@ CORS(app,
      resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}},
      supports_credentials=False)
 
-# HuggingFace Inference API endpoint (updated to use router.huggingface.co)
-HF_API_URL = "https://router.huggingface.co/hf-inference/models/naver-clova-ix/donut-base"
+# HuggingFace Inference API endpoint
+# Try different formats - router endpoint format may vary
+# Option 1: Simple router format
+HF_API_URL = "https://router.huggingface.co/naver-clova-ix/donut-base"
+# Option 2 (if above doesn't work): Original endpoint with token
+# HF_API_URL = "https://api-inference.huggingface.co/models/naver-clova-ix/donut-base"
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", None)  # Optional, but recommended for higher rate limits
 
 # Academic keywords for classification
