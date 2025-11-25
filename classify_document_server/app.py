@@ -28,8 +28,10 @@ CORS(app,
      supports_credentials=False)
 
 # HuggingFace model name
-# Using TrOCR (Text Recognition OCR) - available via Inference API and works well for printed documents
-HF_MODEL_NAME = "microsoft/trocr-base-printed"
+# Try a model that's confirmed to work with Inference API
+# Using BLIP for image captioning - can extract text descriptions from documents
+# This model is confirmed to be available via Inference API
+HF_MODEL_NAME = "Salesforce/blip-image-captioning-base"
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", None)  # Optional, but recommended for higher rate limits
 
 # Initialize InferenceClient if available (handles endpoint routing automatically)
@@ -177,8 +179,8 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                     print(f"📄 Response type: {type(result)}")
                     print(f"📄 Response preview: {str(result)[:200]}...")
                     
-                    # Extract text from TrOCR output
-                    # TrOCR returns text in different formats depending on the API
+                    # Extract text from model output
+                    # BLIP returns captions, OCR models return text
                     if isinstance(result, dict):
                         # Try different possible keys
                         extracted_text = (
