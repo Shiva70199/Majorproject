@@ -368,11 +368,17 @@ def index():
 # Background pre-loading disabled to prevent OOM on Railway free tier
 # Model will be loaded lazily on first request
 # Note: When using gunicorn, this code runs when the module is imported
-print("=" * 50)
-print("🚀 Document Classification Server module loaded")
-print("⚠️  Model will load on first request (may take 30-60s)")
-print("⚠️  Railway free tier may not have enough RAM (needs ~2-3GB)")
-print("=" * 50)
+try:
+    print("=" * 50)
+    print("🚀 Document Classification Server module loaded")
+    print(f"📡 PORT env var: {os.environ.get('PORT', 'NOT SET')}")
+    print("⚠️  Model will load on first request (may take 30-60s)")
+    print("⚠️  Railway free tier may not have enough RAM (needs ~2-3GB)")
+    print("=" * 50)
+except Exception as e:
+    print(f"Error during module initialization: {e}")
+    import traceback
+    traceback.print_exc()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
