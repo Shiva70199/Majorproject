@@ -149,14 +149,15 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                     print(f"📄 Response type: {type(result)}")
                     print(f"📄 Response preview: {str(result)[:200]}...")
                     
-                    # Extract text from Donut output
-                    # Donut returns generated text directly or in a dict
+                    # Extract text from TrOCR output
+                    # TrOCR returns text in different formats depending on the API
                     if isinstance(result, dict):
                         # Try different possible keys
                         extracted_text = (
                             result.get("generated_text", "") or
                             result.get("text", "") or
                             result.get("output", "") or
+                            result.get("transcription", "") or
                             str(result.get("inputs", ""))
                         ).lower()
                         # If still empty, try to get the whole dict as string
@@ -168,7 +169,11 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                         # Result might be a list
                         first_item = result[0]
                         if isinstance(first_item, dict):
-                            extracted_text = first_item.get("generated_text", str(first_item)).lower()
+                            extracted_text = (
+                                first_item.get("generated_text", "") or
+                                first_item.get("text", "") or
+                                str(first_item)
+                            ).lower()
                         else:
                             extracted_text = str(first_item).lower()
                     else:
