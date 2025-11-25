@@ -65,20 +65,25 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
     try:
         extracted_text = ""
         
-        # Try using InferenceClient first (recommended - handles routing automatically)
+        # Try using InferenceClient's post method with explicit task
         if _inference_client is not None:
-            print("📤 Using HuggingFace InferenceClient...")
+            print("📤 Using HuggingFace InferenceClient post method...")
             try:
-                # Try image-to-text (most common for document OCR)
-                result = _inference_client.image_to_text(image=image_bytes)
+                # Use post method with task="image-to-text" - this should work better
+                result = _inference_client.post(
+                    json={
+                        "inputs": base64.b64encode(image_bytes).decode('utf-8')
+                    },
+                    model=HF_MODEL_NAME,
+                    task="image-to-text"
+                )
                 
                 # Parse result
                 if isinstance(result, list) and len(result) > 0:
-                    # Result might be a list of dicts
                     result = result[0]
                 
                 if isinstance(result, dict):
-                    extracted_text = result.get("generated_text", str(result)).lower()
+                    extracted_text = result.get("generated_text", result.get("text", str(result))).lower()
                 elif isinstance(result, str):
                     extracted_text = result.lower()
                 else:
@@ -87,19 +92,30 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 if extracted_text and len(extracted_text) > 10:
                     print(f"✅ InferenceClient extracted text: {extracted_text[:100]}...")
                 else:
-                    print(f"⚠️  InferenceClient returned empty/insufficient text, trying HTTP fallback")
+                    print(f"⚠️  InferenceClient returned empty/insufficient text, trying alternative method")
                     extracted_text = ""
                 
-            except (StopIteration, ValueError, KeyError) as e:
-                # Model not available via InferenceClient - this is expected for Donut
-                print(f"⚠️  InferenceClient error (model may not be available): {e}")
-                print("⚠️  Falling back to direct HTTP requests...")
-                extracted_text = ""
             except Exception as e:
-                print(f"⚠️  InferenceClient error: {e}, falling back to HTTP requests")
-                import traceback
-                traceback.print_exc()
-                extracted_text = ""
+                print(f"⚠️  InferenceClient post error: {e}, trying image_to_text method...")
+                try:
+                    # Fallback to image_to_text method
+                    result = _inference_client.image_to_text(image=image_bytes)
+                    if isinstance(result, list) and len(result) > 0:
+                        result = result[0]
+                    if isinstance(result, dict):
+                        extracted_text = result.get("generated_text", str(result)).lower()
+                    elif isinstance(result, str):
+                        extracted_text = result.lower()
+                    else:
+                        extracted_text = str(result).lower()
+                    if extracted_text and len(extracted_text) > 10:
+                        print(f"✅ InferenceClient image_to_text extracted text: {extracted_text[:100]}...")
+                    else:
+                        extracted_text = ""
+                except Exception as e2:
+                    print(f"⚠️  InferenceClient image_to_text also failed: {e2}")
+                    print("⚠️  Falling back to direct HTTP requests...")
+                    extracted_text = ""
         
         # Fallback to direct HTTP requests if InferenceClient not available or failed
         if not extracted_text:
@@ -130,16 +146,28 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 "inputs": image_base64
             }
             
-            print(f"📤 Calling {api_url}...")
-            # Call HuggingFace Inference API
+            print(f"📤 Trying router endpoint: {api_url}...")
+            # Try router endpoint first
             response = requests.post(
                 api_url,
                 headers=headers,
                 json=payload,
-                timeout=60  # 60 second timeout
+                timeout=60
             )
             
-            print(f"📥 Response status: {response.status_code}")
+            print(f"📥 Router response status: {response.status_code}")
+            
+            # If router returns 404, try fallback endpoint
+            if response.status_code == 404:
+                print(f"📤 Router returned 404, trying fallback endpoint: {api_url_fallback}...")
+                response = requests.post(
+                    api_url_fallback,
+                    headers=headers,
+                    json=payload,
+                    timeout=60
+                )
+                print(f"📥 Fallback response status: {response.status_code}")
+            
             print(f"📥 Response headers: {dict(response.headers)}")
             
             if response.status_code == 200:
