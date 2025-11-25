@@ -5,7 +5,10 @@
 Flask>=3.0.0
 flask-cors>=4.0.0
 
-# HTTP client for HuggingFace API
+# HuggingFace Hub library (handles Inference API automatically)
+huggingface_hub>=0.20.0
+
+# HTTP client (for fallback)
 requests>=2.31.0
 
 # Server
