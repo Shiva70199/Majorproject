@@ -89,6 +89,11 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                     print(f"⚠️  InferenceClient returned empty/insufficient text, trying HTTP fallback")
                     extracted_text = ""
                 
+            except (StopIteration, ValueError, KeyError) as e:
+                # Model not available via InferenceClient - this is expected for Donut
+                print(f"⚠️  InferenceClient error (model may not be available): {e}")
+                print("⚠️  Falling back to direct HTTP requests...")
+                extracted_text = ""
             except Exception as e:
                 print(f"⚠️  InferenceClient error: {e}, falling back to HTTP requests")
                 import traceback
