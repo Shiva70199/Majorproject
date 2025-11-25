@@ -185,6 +185,17 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                     "reason": "HuggingFace model is loading. Please wait 30-60 seconds and try again.",
                     "error": "Model loading"
                 }
+            elif response.status_code == 410:
+                # Deprecated endpoint
+                error_text = response.text[:500]
+                error_header = response.headers.get('X-Error-Message', '')
+                return {
+                    "is_academic": False,
+                    "score": 0,
+                    "text": "",
+                    "reason": f"API endpoint deprecated (410): {error_header if error_header else error_text}. The endpoint is no longer supported.",
+                    "error": "Deprecated endpoint"
+                }
             elif response.status_code == 403:
                 # Authentication/permission error
                 error_text = response.text[:500]
