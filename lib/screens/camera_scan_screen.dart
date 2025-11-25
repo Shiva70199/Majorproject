@@ -172,20 +172,15 @@ class _CameraScanScreenState extends State<CameraScanScreen> {
         return;
       }
 
-      // Classify document using Donut-base model
-      final classificationResult = await _classifierService.classifyDocument(
-        fileBytes: imageBytes,
-        fileName: _capturedImage!.name,
-      );
+      // Classify document using TFLite model (offline)
+      final classificationResult = await _classifier.classify(imageBytes);
 
-      if (!classificationResult.isValid) {
+      if (!classificationResult.isAcademic) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                classificationResult.reason.isNotEmpty
-                    ? classificationResult.reason
-                    : 'Only academic documents (marks cards, certificates, ID cards) are allowed.',
+                'Only academic documents are allowed. (Confidence: ${(classificationResult.confidence * 100).toStringAsFixed(1)}%)',
               ),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 5),
@@ -194,9 +189,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> {
         }
         setState(() {
           _isScanning = false;
-          _scanResult = classificationResult.reason.isNotEmpty
-              ? classificationResult.reason
-              : 'Rejected: Not an academic document';
+          _scanResult = 'Rejected: Not an academic document';
         });
         return;
       }
