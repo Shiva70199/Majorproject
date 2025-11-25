@@ -125,6 +125,16 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 "reason": f"Authentication error (403): Your HuggingFace token may not have sufficient permissions. Please check your token at https://huggingface.co/settings/tokens and ensure it has 'read' access. Error: {error_text}",
                 "error": "Authentication failed"
             }
+        elif response.status_code == 404:
+            # Model not found - endpoint might be wrong
+            error_text = response.text[:500]
+            return {
+                "is_academic": False,
+                "score": 0,
+                "text": "",
+                "reason": f"Model not found (404): The endpoint URL might be incorrect or the model is not available via Inference API. Error: {error_text}. Please check if the model 'naver-clova-ix/donut-base' is available for inference.",
+                "error": "Model not found"
+            }
         else:
             # Error response
             error_text = response.text[:200]
