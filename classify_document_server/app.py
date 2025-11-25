@@ -98,20 +98,28 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
         # Fallback to direct HTTP requests if InferenceClient not available or failed
         if not extracted_text:
             print("📤 Using direct HTTP request to HuggingFace API...")
-            # Use the original api-inference endpoint
-            api_url = f"https://api-inference.huggingface.co/models/{HF_MODEL_NAME}"
+            # Use router.huggingface.co (api-inference.huggingface.co is deprecated)
+            # Router endpoint format: https://router.huggingface.co/{model_id}
+            api_url = f"https://router.huggingface.co/{HF_MODEL_NAME}"
             
-            # Prepare headers
+            # Prepare headers - router.huggingface.co requires token
             headers = {"Content-Type": "application/json"}
             if HF_API_TOKEN:
                 headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
             else:
-                print("⚠️  Warning: No HF_API_TOKEN set. Using unauthenticated requests (may have rate limits)")
+                print("⚠️  Warning: No HF_API_TOKEN set. Router endpoint requires authentication!")
+                return {
+                    "is_academic": False,
+                    "score": 0,
+                    "text": "",
+                    "reason": "HuggingFace API token (HF_API_TOKEN) is required for router.huggingface.co. Please add your token to Railway environment variables.",
+                    "error": "Missing API token"
+                }
             
             # Encode image to base64
             image_base64 = base64.b64encode(image_bytes).decode('utf-8')
             
-            # Prepare request payload - Donut expects base64 image
+            # Prepare request payload - Router endpoint expects base64 image in "inputs"
             payload = {
                 "inputs": image_base64
             }
