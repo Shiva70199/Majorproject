@@ -13,10 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first (for better caching)
 COPY requirements-docker.txt requirements.txt
 
-# Install Python dependencies with optimizations
-# Use CPU-only PyTorch (much smaller than GPU version, ~500MB vs ~2GB)
+# Install Python dependencies (lightweight - no PyTorch needed!)
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu && \
     pip install --no-cache-dir -r requirements.txt && \
     pip cache purge && \
     rm -rf /root/.cache/pip && \
