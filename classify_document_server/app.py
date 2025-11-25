@@ -28,10 +28,9 @@ CORS(app,
      supports_credentials=False)
 
 # HuggingFace model name
-# Try a model that's confirmed to work with Inference API
-# Using BLIP for image captioning - can extract text descriptions from documents
-# This model is confirmed to be available via Inference API
-HF_MODEL_NAME = "Salesforce/blip-image-captioning-base"
+# Using a model confirmed to work with Inference API
+# nlpconnect/vit-gpt2-image-captioning is widely available and works well
+HF_MODEL_NAME = "nlpconnect/vit-gpt2-image-captioning"
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", None)  # Optional, but recommended for higher rate limits
 
 # Initialize InferenceClient if available (handles endpoint routing automatically)
@@ -122,34 +121,26 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
         # Fallback to direct HTTP requests if InferenceClient not available or failed
         if not extracted_text:
             print("📤 Using direct HTTP request to HuggingFace API...")
-            # Use router.huggingface.co (api-inference.huggingface.co is deprecated)
-            # Router endpoint format: https://router.huggingface.co/{model_id}
-            api_url = f"https://router.huggingface.co/{HF_MODEL_NAME}"
             
-            # Prepare headers - router.huggingface.co requires token
+            # Prepare headers
             headers = {"Content-Type": "application/json"}
             if HF_API_TOKEN:
                 headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
             else:
-                print("⚠️  Warning: No HF_API_TOKEN set. Router endpoint requires authentication!")
-                return {
-                    "is_academic": False,
-                    "score": 0,
-                    "text": "",
-                    "reason": "HuggingFace API token (HF_API_TOKEN) is required for router.huggingface.co. Please add your token to Railway environment variables.",
-                    "error": "Missing API token"
-                }
+                print("⚠️  Warning: No HF_API_TOKEN set. Some endpoints require authentication!")
             
             # Encode image to base64
             image_base64 = base64.b64encode(image_bytes).decode('utf-8')
             
-            # Prepare request payload - Router endpoint expects base64 image in "inputs"
+            # Prepare request payload
             payload = {
                 "inputs": image_base64
             }
             
-            print(f"📤 Trying router endpoint: {api_url}...")
-            # Try router endpoint first
+            # Try api-inference endpoint first (more reliable)
+            api_url = f"https://api-inference.huggingface.co/models/{HF_MODEL_NAME}"
+            print(f"📤 Trying api-inference endpoint: {api_url}...")
+            
             response = requests.post(
                 api_url,
                 headers=headers,
@@ -157,18 +148,19 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 timeout=60
             )
             
-            print(f"📥 Router response status: {response.status_code}")
+            print(f"📥 Response status: {response.status_code}")
             
-            # If router returns 404, try fallback endpoint
-            if response.status_code == 404:
-                print(f"📤 Router returned 404, trying fallback endpoint: {api_url_fallback}...")
+            # If api-inference returns 410 (deprecated) or 404, try router endpoint
+            if response.status_code in [404, 410]:
+                api_url_router = f"https://router.huggingface.co/{HF_MODEL_NAME}"
+                print(f"📤 api-inference failed, trying router endpoint: {api_url_router}...")
                 response = requests.post(
-                    api_url_fallback,
+                    api_url_router,
                     headers=headers,
                     json=payload,
                     timeout=60
                 )
-                print(f"📥 Fallback response status: {response.status_code}")
+                print(f"📥 Router response status: {response.status_code}")
             
             print(f"📥 Response headers: {dict(response.headers)}")
             
