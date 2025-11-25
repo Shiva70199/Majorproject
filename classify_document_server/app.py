@@ -83,14 +83,20 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 else:
                     extracted_text = str(result).lower()
                     
-                print(f"✅ InferenceClient extracted text: {extracted_text[:100]}...")
+                if extracted_text and len(extracted_text) > 10:
+                    print(f"✅ InferenceClient extracted text: {extracted_text[:100]}...")
+                else:
+                    print(f"⚠️  InferenceClient returned empty/insufficient text, trying HTTP fallback")
+                    extracted_text = ""
                 
             except Exception as e:
                 print(f"⚠️  InferenceClient error: {e}, falling back to HTTP requests")
+                import traceback
+                traceback.print_exc()
                 extracted_text = ""
         
         # Fallback to direct HTTP requests if InferenceClient not available or failed
-        if not extracted_text and _inference_client is None:
+        if not extracted_text:
             print("📤 Using direct HTTP request to HuggingFace API...")
             # Use the original api-inference endpoint
             api_url = f"https://api-inference.huggingface.co/models/{HF_MODEL_NAME}"
@@ -99,15 +105,18 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
             headers = {"Content-Type": "application/json"}
             if HF_API_TOKEN:
                 headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
+            else:
+                print("⚠️  Warning: No HF_API_TOKEN set. Using unauthenticated requests (may have rate limits)")
             
             # Encode image to base64
             image_base64 = base64.b64encode(image_bytes).decode('utf-8')
             
-            # Prepare request payload
+            # Prepare request payload - Donut expects base64 image
             payload = {
                 "inputs": image_base64
             }
             
+            print(f"📤 Calling {api_url}...")
             # Call HuggingFace Inference API
             response = requests.post(
                 api_url,
@@ -116,17 +125,49 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 timeout=60  # 60 second timeout
             )
             
+            print(f"📥 Response status: {response.status_code}")
+            print(f"📥 Response headers: {dict(response.headers)}")
+            
             if response.status_code == 200:
                 # Parse response
-                result = response.json()
-                
-                # Extract text from Donut output
-                if isinstance(result, dict):
-                    extracted_text = result.get("generated_text", "").lower()
-                elif isinstance(result, str):
-                    extracted_text = result.lower()
-                else:
-                    extracted_text = str(result).lower()
+                try:
+                    result = response.json()
+                    print(f"📄 Response type: {type(result)}")
+                    print(f"📄 Response preview: {str(result)[:200]}...")
+                    
+                    # Extract text from Donut output
+                    # Donut returns generated text directly or in a dict
+                    if isinstance(result, dict):
+                        # Try different possible keys
+                        extracted_text = (
+                            result.get("generated_text", "") or
+                            result.get("text", "") or
+                            result.get("output", "") or
+                            str(result.get("inputs", ""))
+                        ).lower()
+                        # If still empty, try to get the whole dict as string
+                        if not extracted_text:
+                            extracted_text = str(result).lower()
+                    elif isinstance(result, str):
+                        extracted_text = result.lower()
+                    elif isinstance(result, list) and len(result) > 0:
+                        # Result might be a list
+                        first_item = result[0]
+                        if isinstance(first_item, dict):
+                            extracted_text = first_item.get("generated_text", str(first_item)).lower()
+                        else:
+                            extracted_text = str(first_item).lower()
+                    else:
+                        extracted_text = str(result).lower()
+                    
+                    print(f"✅ Extracted text length: {len(extracted_text)}")
+                    if extracted_text:
+                        print(f"✅ Extracted text preview: {extracted_text[:200]}...")
+                        
+                except json.JSONDecodeError as e:
+                    print(f"❌ JSON decode error: {e}")
+                    print(f"❌ Response text: {response.text[:500]}")
+                    extracted_text = ""
             elif response.status_code == 503:
                 # Model is loading (first request)
                 return {
@@ -167,18 +208,30 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                     "error": f"API error: {response.status_code}"
                 }
         
-        # If we still don't have text, return error
-        if not extracted_text:
+        # Clean up the text
+        if extracted_text:
+            extracted_text = extracted_text.replace("<s_cord-v2>", "").replace("</s>", "").strip()
+        
+        # If we still don't have text, return error with more details
+        if not extracted_text or len(extracted_text.strip()) < 5:
+            error_details = []
+            if _inference_client is None:
+                error_details.append("InferenceClient not available")
+            if not HF_API_TOKEN:
+                error_details.append("No API token set")
+            
+            error_msg = "Failed to extract text from image."
+            if error_details:
+                error_msg += f" Issues: {', '.join(error_details)}."
+            error_msg += " The model may not be available via Inference API, or the image format is not supported. Please check Railway logs for more details."
+            
             return {
                 "is_academic": False,
                 "score": 0,
                 "text": "",
-                "reason": "Failed to extract text from image. The model may not be available or the image format is not supported.",
+                "reason": error_msg,
                 "error": "No text extracted"
             }
-        
-        # Clean up the text
-        extracted_text = extracted_text.replace("<s_cord-v2>", "").replace("</s>", "").strip()
         
         # Count academic keyword matches
         match_count = 0
