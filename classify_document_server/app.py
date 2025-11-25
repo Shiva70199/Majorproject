@@ -48,7 +48,7 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
         # Encode image to base64
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         
-        # Prepare request payload
+        # Prepare request payload - HuggingFace API expects base64 image
         payload = {
             "inputs": image_base64
         }
@@ -244,4 +244,3 @@ if __name__ == '__main__':
     print(f"📡 Server starting on port {port}...")
     print("=" * 50)
     app.run(host='0.0.0.0', port=port, debug=False)
-
