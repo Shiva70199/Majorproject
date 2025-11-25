@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/document_category.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/ocr_service.dart';
-import '../services/document_classifier_service.dart';
+import '../services/document_classifier.dart';
 import '../services/supa_service.dart';
 
 /// Upload screen for selecting and uploading documents
@@ -27,7 +27,7 @@ class _UploadScreenState extends State<UploadScreen> {
   final _firebaseAuth = FirebaseAuthService();
   final _supaService = SupaService();
   final _ocrService = OCRService(); // Only for file type validation
-  final _classifierService = DocumentClassifierService();
+  final _classifier = DocumentClassifier();
   
   // Selected file
   PlatformFile? _selectedFile;
@@ -125,20 +125,15 @@ class _UploadScreenState extends State<UploadScreen> {
         return;
       }
 
-      // Classify document using Donut-base model
-      final classificationResult = await _classifierService.classifyDocument(
-        fileBytes: fileBytes,
-        fileName: _selectedFile!.name,
-      );
+      // Classify document using TFLite model (offline)
+      final classificationResult = await _classifier.classify(fileBytes);
 
-      if (!classificationResult.isValid) {
+      if (!classificationResult.isAcademic) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                classificationResult.reason.isNotEmpty
-                    ? classificationResult.reason
-                    : 'Only academic documents (marks cards, certificates, ID cards) are allowed.',
+                'Only academic documents are allowed. (Confidence: ${(classificationResult.confidence * 100).toStringAsFixed(1)}%)',
               ),
               backgroundColor: Colors.red,
               duration: const Duration(seconds: 5),

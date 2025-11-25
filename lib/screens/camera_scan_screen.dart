@@ -7,7 +7,7 @@ import 'package:camera/camera.dart';
 import '../models/document_category.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/ocr_service.dart';
-import '../services/document_classifier_service.dart';
+import '../services/document_classifier.dart';
 import '../services/supa_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -46,7 +46,7 @@ class _CameraScanScreenState extends State<CameraScanScreen> {
   final _firebaseAuth = FirebaseAuthService();
   final _supaService = SupaService();
   final _ocrService = OCRService(); // Only for file type validation
-  final _classifierService = DocumentClassifierService();
+  final _classifier = DocumentClassifier();
 
   DocumentCategoryDefinition get _category =>
       DocumentCategories.byId(widget.categoryId) ??

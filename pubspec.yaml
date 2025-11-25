@@ -32,9 +32,11 @@ dependencies:
   # UI/Utilities
   intl: ^0.19.0
   email_auth: ^2.0.0
-  google_mlkit_text_recognition: ^0.13.0
-  google_mlkit_face_detection: ^0.11.1
   image: ^4.1.7
+  
+  # TFLite for offline image classification
+  tflite_flutter: ^0.11.0
+  tflite_flutter_helper: ^0.4.1
   
   # Camera for document scanning
   camera: ^0.11.0+2
@@ -50,3 +52,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  assets:
+    - assets/model/safedocs_classifier.tflite
+    - assets/model/labels.txt
