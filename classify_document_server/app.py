@@ -28,7 +28,8 @@ CORS(app,
      supports_credentials=False)
 
 # HuggingFace model name
-HF_MODEL_NAME = "naver-clova-ix/donut-base"
+# Using TrOCR (Text Recognition OCR) - available via Inference API and works well for printed documents
+HF_MODEL_NAME = "microsoft/trocr-base-printed"
 HF_API_TOKEN = os.environ.get("HF_API_TOKEN", None)  # Optional, but recommended for higher rate limits
 
 # Initialize InferenceClient if available (handles endpoint routing automatically)
@@ -232,9 +233,9 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                     "error": f"API error: {response.status_code}"
                 }
         
-        # Clean up the text
+        # Clean up the text (remove any special tokens)
         if extracted_text:
-            extracted_text = extracted_text.replace("<s_cord-v2>", "").replace("</s>", "").strip()
+            extracted_text = extracted_text.replace("<s_cord-v2>", "").replace("</s>", "").replace("<pad>", "").strip()
         
         # If we still don't have text, return error with more details
         if not extracted_text or len(extracted_text.strip()) < 5:
