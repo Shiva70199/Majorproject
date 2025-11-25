@@ -42,13 +42,18 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
     try:
         # Prepare headers
         headers = {"Content-Type": "application/json"}
+        # For router.huggingface.co, token is required and must be in Authorization header
         if HF_API_TOKEN:
             headers["Authorization"] = f"Bearer {HF_API_TOKEN}"
+        else:
+            # If no token, try without auth (may have rate limits)
+            print("⚠️  Warning: No HF_API_TOKEN set. Using unauthenticated requests (may have rate limits)")
         
         # Encode image to base64
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         
         # Prepare request payload - HuggingFace API expects base64 image
+        # For router endpoint, format might be slightly different
         payload = {
             "inputs": image_base64
         }
@@ -109,6 +114,16 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
                 "text": "",
                 "reason": "HuggingFace model is loading. Please wait 30-60 seconds and try again.",
                 "error": "Model loading"
+            }
+        elif response.status_code == 403:
+            # Authentication/permission error
+            error_text = response.text[:500]
+            return {
+                "is_academic": False,
+                "score": 0,
+                "text": "",
+                "reason": f"Authentication error (403): Your HuggingFace token may not have sufficient permissions. Please check your token at https://huggingface.co/settings/tokens and ensure it has 'read' access. Error: {error_text}",
+                "error": "Authentication failed"
             }
         else:
             # Error response
