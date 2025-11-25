@@ -16,14 +16,20 @@ app = Flask(__name__)
 @app.route('/health', methods=['GET'])
 def health_check_minimal():
     """Minimal health check - works even if other imports fail"""
-    return jsonify({
-        "status": "ok",
-        "message": "Server is running"
-    }), 200
+    try:
+        return jsonify({
+            "status": "ok",
+            "message": "Server is running",
+            "port": os.environ.get('PORT', 'not set')
+        }), 200
+    except Exception as e:
+        # Even if jsonify fails, return plain text
+        return f"OK - {str(e)}", 200
 
 # Now import other dependencies
 from flask_cors import CORS
 import base64
+import time
 from io import BytesIO
 from typing import Dict, Any, Optional
 import gc
@@ -37,8 +43,8 @@ except ImportError as e:
     DEPENDENCIES_AVAILABLE = False
     print(f"Warning: transformers, PIL, or torch not available: {e}")
 
-app = Flask(__name__)
 # Enable CORS for all routes with explicit configuration for Flutter Web
+# NOTE: Don't recreate app - use the one created above with health endpoint
 CORS(app, 
      resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}},
      supports_credentials=False)

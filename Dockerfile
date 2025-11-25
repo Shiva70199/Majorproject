@@ -26,8 +26,8 @@ RUN pip install --no-cache-dir --upgrade pip && \
 # Copy application code
 COPY app.py .
 
-# Expose port (Railway sets PORT env var)
-EXPOSE $PORT
+# Expose port (Railway sets PORT env var, default to 8080)
+EXPOSE 8080
 
 # Run with gunicorn - use explicit port binding with fallback
 # Railway sets PORT env var, but we need to ensure it's used correctly
