@@ -1,19 +1,12 @@
-# Optimized requirements for Docker (torch installed separately)
+# Lightweight requirements for HuggingFace Inference API version
+# No heavy ML dependencies needed - model runs on HuggingFace servers
+
 # Web framework
 Flask>=3.0.0
 flask-cors>=4.0.0
 
-# ML dependencies (torch installed in Dockerfile as CPU-only)
-transformers>=4.30.0
-Pillow>=10.0.0
-numpy>=1.24.0
-
-# HuggingFace model dependencies
-sentencepiece>=0.1.99
-protobuf>=3.20.0
-
-# Image processing (headless version, smaller)
-opencv-python-headless>=4.8.0
+# HTTP client for HuggingFace API
+requests>=2.31.0
 
 # Server
 gunicorn>=21.2.0
