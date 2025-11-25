@@ -48,13 +48,17 @@ if HF_HUB_AVAILABLE:
         _inference_client = None
 
 # Academic keywords for classification
+# Expanded list to catch more variations and caption descriptions
 ACADEMIC_KEYWORDS = [
     "grade", "marks", "certificate", "university", "college",
     "board", "percentage", "subject", "credits", "sgpa",
     "cgpa", "register", "usn", "student", "id card", "exam",
     "semester", "marksheet", "degree", "diploma", "transcript",
     "academic", "institute", "education", "result", "score",
-    "pass", "fail", "division", "class", "roll", "admission"
+    "pass", "fail", "division", "class", "roll", "admission",
+    "document", "paper", "form", "report card", "report", "card",
+    "10th", "12th", "tenth", "twelfth", "ssc", "hsc", "cbse", "icse",
+    "school", "institution", "qualification", "achievement"
 ]
 
 
@@ -289,12 +293,22 @@ def classify_with_hf_api(image_bytes: bytes) -> Dict[str, Any]:
         match_count = 0
         matched_keywords = []
         
+        # Convert to lowercase for case-insensitive matching
+        text_lower = extracted_text.lower()
+        
         for keyword in ACADEMIC_KEYWORDS:
-            if keyword.lower() in extracted_text:
+            if keyword.lower() in text_lower:
                 match_count += 1
                 matched_keywords.append(keyword)
         
-        is_academic = match_count >= 2
+        # Lower threshold to 1 match for image captioning models (they may be less specific)
+        # Also check if extracted text is substantial (not just empty/generic)
+        is_academic = match_count >= 1 and len(extracted_text.strip()) > 10
+        
+        # Log for debugging
+        print(f"📊 Classification: match_count={match_count}, text_length={len(extracted_text)}, is_academic={is_academic}")
+        print(f"📊 Matched keywords: {matched_keywords[:5]}")
+        print(f"📊 Extracted text preview: {extracted_text[:200]}")
         
         if is_academic:
             reason = f"Document classified as academic (matched {match_count} keywords: {', '.join(matched_keywords[:5])})"
