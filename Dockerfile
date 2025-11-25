@@ -25,11 +25,13 @@ RUN pip install --no-cache-dir --upgrade pip && \
 
 # Copy application code
 COPY app.py .
+COPY start.sh .
+
+# Make startup script executable
+RUN chmod +x start.sh
 
 # Expose port (Railway sets PORT env var, default to 8080)
 EXPOSE 8080
 
-# Run with gunicorn - use explicit port binding with fallback
-# Railway sets PORT env var, but we need to ensure it's used correctly
-# Add --preload to catch import errors early
-CMD sh -c "gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --access-logfile - --error-logfile - --preload --log-level info"
+# Use startup script that properly handles PORT variable
+CMD ["./start.sh"]
