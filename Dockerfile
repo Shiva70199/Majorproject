@@ -31,4 +31,5 @@ EXPOSE 8080
 
 # Run with gunicorn - use explicit port binding with fallback
 # Railway sets PORT env var, but we need to ensure it's used correctly
-CMD sh -c "gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --access-logfile - --error-logfile -"
+# Add --preload to catch import errors early
+CMD sh -c "gunicorn app:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --timeout 120 --access-logfile - --error-logfile - --preload --log-level info"

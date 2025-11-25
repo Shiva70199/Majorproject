@@ -26,8 +26,26 @@ def health_check_minimal():
         # Even if jsonify fails, return plain text
         return f"OK - {str(e)}", 200
 
-# Now import other dependencies
-from flask_cors import CORS
+# Now import other dependencies (wrap in try-except to prevent startup failures)
+try:
+    from flask_cors import CORS
+    # Enable CORS for all routes with explicit configuration for Flutter Web
+    # NOTE: Don't recreate app - use the one created above with health endpoint
+    CORS(app, 
+         resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}},
+         supports_credentials=False)
+    print("✅ CORS enabled")
+except ImportError as e:
+    print(f"⚠️  Warning: flask-cors not available: {e}")
+    # Add manual CORS headers if CORS library fails
+    @app.after_request
+    def add_cors_headers(response):
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        return response
+    print("✅ Manual CORS headers enabled")
+
 import base64
 import time
 from io import BytesIO
@@ -39,15 +57,10 @@ try:
     from PIL import Image
     import torch
     DEPENDENCIES_AVAILABLE = True
+    print("✅ ML dependencies loaded")
 except ImportError as e:
     DEPENDENCIES_AVAILABLE = False
-    print(f"Warning: transformers, PIL, or torch not available: {e}")
-
-# Enable CORS for all routes with explicit configuration for Flutter Web
-# NOTE: Don't recreate app - use the one created above with health endpoint
-CORS(app, 
-     resources={r"/*": {"origins": "*", "methods": ["GET", "POST", "OPTIONS"], "allow_headers": ["Content-Type", "Authorization"]}},
-     supports_credentials=False)
+    print(f"⚠️  Warning: transformers, PIL, or torch not available: {e}")
 
 # Academic keywords for classification
 ACADEMIC_KEYWORDS = [
